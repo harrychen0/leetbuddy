@@ -77,7 +77,7 @@ const resultsOutput = ref<string | null>(null)
 const status = ref<string | null>(null)
 const time = ref<string | null>(null)
 const memory = ref<string | null>(null)
-const stdinRef = ref('')
+const stdinRef = ref('[2,7,11,15]\n9')
 
 // Ref for the Monaco editor instance
 const editorInstance = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -87,32 +87,30 @@ const handleEditorMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
   editorInstance.value = editor
 }
 
-const code = ref(`import sys
-import json
+// Update default code to be a function stub with instructions
+const code = ref(`def two_sum(nums: list[int], target: int) -> list[int]:
+    \"\"\"
+    Given an array of integers nums and an integer target, return indices
+    of the two numbers such that they add up to target.
 
-def two_sum(nums, target):
-    num_map = {}
-    for i, num in enumerate(nums):
-        complement = target - num
-        if complement in num_map:
-            return [num_map[complement], i]
-        num_map[num] = i
-    return []
+    You may assume that each input would have exactly one solution,
+    and you may not use the same element twice.
 
-# Read input from stdin
-lines = sys.stdin.readlines()
-if len(lines) >= 2:
-    try:
-      # Assuming first line is JSON list, second line is integer target
-      nums_list = json.loads(lines[0])
-      target_val = int(lines[1])
-      result = two_sum(nums_list, target_val)
-      # Output the result as JSON
-      print(json.dumps(result))
-    except (json.JSONDecodeError, ValueError, IndexError) as e:
-        print(f"Error processing input: {e}", file=sys.stderr)
-else:
-  print("Input requires at least two lines: a JSON list of nums and the target integer.", file=sys.stderr)
+    You can return the answer in any order.
+
+    Args:
+        nums: A list of integers.
+        target: The target sum.
+
+    Returns:
+        A list containing the indices of the two numbers.
+        Return an empty list if no solution is found.
+    \"\"\"
+    # --- WRITE YOUR SOLUTION HERE ---
+
+    pass # Remove this line and implement your solution
+
+    # --- END OF SOLUTION ---
 `)
 
 const description = `Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.
@@ -321,14 +319,21 @@ const statusClass = computed(() => {
 }
 
 .editor-container {
-  flex: 1;
+  flex-grow: 2;
+  flex-basis: 0;
   background-color: #1e1e1e;
+  min-height: 0;
 }
 
 .io-panel {
   padding: 10px 16px;
-  background-color: #252526; /* Slightly lighter than editor bg */
+  background-color: #252526;
   border-top: 1px solid #333;
+  flex-grow: 1;
+  flex-basis: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .io-panel h3 {
@@ -336,29 +341,30 @@ const statusClass = computed(() => {
   margin-bottom: 5px;
   color: #ccc;
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .io-panel textarea {
   width: 100%;
-  min-height: 60px; /* Adjust as needed */
   background-color: #1e1e1e;
   color: #d4d4d4;
   border: 1px solid #333;
   border-radius: 4px;
   padding: 5px;
   font-family: monospace;
-  resize: vertical; /* Allow vertical resizing */
-  box-sizing: border-box; /* Include padding and border in width */
+  resize: vertical;
+  box-sizing: border-box;
+  flex-grow: 1;
 }
 
 .results-panel {
   padding: 16px;
-  background-color: #252526; /* Slightly lighter than editor bg */
+  background-color: #252526;
   border-top: 1px solid #333;
   color: #ccc;
   font-family: monospace;
-  min-height: 100px; /* Ensure panel has some height */
-  overflow-y: auto; /* Add scroll if content overflows */
+  min-height: 100px;
+  overflow-y: auto;
 }
 
 .results-panel h3 {
@@ -368,29 +374,29 @@ const statusClass = computed(() => {
 }
 
 .results-panel pre {
-  white-space: pre-wrap; /* Wrap long lines */
+  white-space: pre-wrap;
   word-wrap: break-word;
   margin: 0;
   padding: 10px;
-  background-color: #1e1e1e; /* Match editor bg */
+  background-color: #1e1e1e;
   border-radius: 4px;
 }
 
 .status-accepted {
-  color: #4caf50; /* Green */
+  color: #4caf50;
   font-weight: bold;
 }
 
 .status-error {
-  color: #f44336; /* Red */
+  color: #f44336;
   font-weight: bold;
 }
 
 .status-submitting {
-  color: #ffc107; /* Amber */
+  color: #ffc107;
 }
 
 .status-other {
-  color: #ccc; /* Default */
+  color: #ccc;
 }
 </style>

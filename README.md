@@ -1,5 +1,3 @@
-# leetbuddy
-
 # LeetBuddy - Online Code Execution Platform
 
 A web application that allows users to write and execute code using the Judge0 API through RapidAPI. Currently in development, goal is to add AI features for code analysis.
