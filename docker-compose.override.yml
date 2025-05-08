@@ -1,4 +1,3 @@
-# docker-compose.override.yml
 # Development specific overrides
 
 services:
