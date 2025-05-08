@@ -1,57 +1,59 @@
 # LeetBuddy - Online Code Execution Platform
 
-A web application that allows users to write and execute code using the Judge0 API through RapidAPI. Currently in development, goal is to add AI features for code analysis.
+A web application that allows users to write and execute code using the Judge0 API through RapidAPI. It includes a backend service, a frontend interface, and a PostgreSQL database, all containerized using Docker.
 
 ## Features
 
-- Code execution in multiple programming languages
-- Real-time compilation and execution results
-- Clean and intuitive user interface
-- Secure API handling with environment variables
+- Code execution in multiple programming languages via Judge0.
+- Real-time compilation and execution results.
+- Clean and intuitive user interface.
+- Secure API handling with environment variables.
+- Dockerized for easy setup and deployment.
 
-## Setup
+## Prerequisites
 
-1. Clone the repository
-2. Create a `.env` file in the root directory using `.env_example` as a template:
+- Docker and Docker Compose installed.
+- A RapidAPI account with a subscription to the Judge0 API.
 
-   ```
-   RAPIDAPI_JUDGE0_KEY="your_rapidapi_key"
-   RAPIDAPI_JUDGE0_HOST="your_rapidapi_host"
-   ```
+## Setup with Docker (Recommended)
 
-3. Install dependencies:
+1.  **Clone the repository:**
 
-   ```bash
-   # Install backend dependencies
-   cd backend
-   npm install
+    ```bash
+    git clone <your-repository-url>
+    cd leetbuddy # Or your project directory name
+    ```
 
-   # Install frontend dependencies
-   cd ../frontend
-   npm install
-   ```
+2.  **Create Environment File:**
+    Copy the `.env_example` file to a new file named `.env` in the root directory of the project.
 
-4. Start the development servers:
+    ```bash
+    cp .env_example .env
+    ```
 
-   ```bash
-   # Start backend server (from backend directory)
-   npm run dev
+    Update the `.env` file with your specific credentials and configurations.
 
-   # Start frontend server (from frontend directory)
-   npm run dev
-   ```
+3.  **Build and Run Containers:**
+    Use Docker Compose to build the images and start the services in detached mode:
 
-5. Access the application at `http://localhost:5173` (or the port shown in your terminal)
+    ```bash
+    docker compose up -d --build
+    ```
 
-## Environment Variables
+    If working in dev environment (default), access the application at
 
-The following environment variables need to be set in your `.env` file:
+    - Frontend: `http://localhost:5173`
+    - Backend API: `http://localhost:3000`
+    - Database (if needed for direct access, e.g., with pgAdmin): `localhost:5432`
 
-- `RAPIDAPI_JUDGE0_KEY`: Your RapidAPI key for Judge0 API
-- `RAPIDAPI_JUDGE0_HOST`: The RapidAPI host for Judge0 API
+    To switch to prod environment, delete the override.yml file and acces the applicaiton at `http://localhost:8080`
 
-You can obtain these credentials by:
-
-1. Creating an account on RapidAPI
-2. Subscribing to the Judge0 API
-3. Copying your API key and host from the RapidAPI dashboard
+4.  **Stopping the Application:**
+    To stop the services:
+    ```bash
+    docker compose down
+    ```
+    To stop and remove volumes (including database data):
+    ```bash
+    docker compose down -v
+    ```
