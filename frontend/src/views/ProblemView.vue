@@ -1,9 +1,12 @@
 <template>
   <div class="problem-view">
     <div class="problem-header">
-      <button class="back-button" @click="router.back()">← Back to Problems</button>
+      <button class="back-button" @click="goBack">← Back to Problems</button>
     </div>
-    <Splitpanes class="default-theme" style="height: calc(100vh - 70px)">
+    <div v-if="isLoadingProblem" class="loading-problem-message">Loading problem details...</div>
+    <div v-if="problemError" class="error-problem-message">{{ problemError }}</div>
+
+    <Splitpanes v-if="!isLoadingProblem && problemDetails" class="default-theme" style="height: calc(100vh - 70px)">
       <Pane size="40">
         <div class="left-pane-content">
           <div class="left-pane-toolbar">
@@ -31,25 +34,7 @@
           </div>
 
           <div v-if="activeTab === 'description'" class="tab-content problem-description-content">
-            <div class="problem-description">
-              <h1>Two Sum</h1>
-              <div class="difficulty">Easy</div>
-              <div class="description" v-html="renderedDescription"></div>
-              <div class="examples">
-                <h3>Examples:</h3>
-                <div v-for="(example, index) in examples" :key="index" class="example">
-                  <h4>Example {{ index + 1 }}:</h4>
-                  <pre><code>Input: {{ example.input }}
-Output: {{ example.output }}</code></pre>
-                </div>
-              </div>
-              <div class="constraints">
-                <h3>Constraints:</h3>
-                <ul>
-                  <li v-for="(constraint, index) in constraints" :key="index">{{ constraint }}</li>
-                </ul>
-              </div>
-            </div>
+            <ProblemDescription :problem="problemDetails" />
           </div>
 
           <div v-if="activeTab === 'testcase'" class="tab-content testcase-results-content">
@@ -136,10 +121,10 @@ Output: {{ example.output }}</code></pre>
       <Pane size="60">
         <div class="editor-section">
           <div class="editor-header">
-            <button class="run-button run-tests-button" @click="runUserTests" :disabled="isLoading || isLoadingUserTests">
+             <button class="run-button run-tests-button" @click="runUserTests" :disabled="isLoadingProblem || isLoading || isLoadingUserTests">
               {{ isLoadingUserTests ? 'Running Custom Tests...' : 'Run Tests' }}
             </button>
-            <button class="run-button submit-button" @click="runCode" :disabled="isLoading || isLoadingUserTests">
+            <button class="run-button submit-button" @click="runCode" :disabled="isLoadingProblem || isLoading || isLoadingUserTests">
               {{ isLoading ? 'Submitting...' : 'Submit' }}
             </button>
           </div>
@@ -160,22 +145,29 @@ Output: {{ example.output }}</code></pre>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, shallowRef, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, shallowRef, watchEffect, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
 import MonacoEditor from '@/components/MonacoEditor.vue'
+import ProblemDescription from '@/components/ProblemDescription.vue'
 import type * as monaco from 'monaco-editor'
-import { marked } from 'marked'
-import axios from 'axios'
+import { judge0Service, type ProblemDetails } from '@/services/judge0.ts'
 
+const route = useRoute()
 const router = useRouter()
+
+// Problem Details State
+const problemDetails = ref<ProblemDetails | null>(null)
+const isLoadingProblem = ref(true)
+const problemError = ref<string | null>(null)
+
+// Editor and Submission State (mostly existing)
 const isLoading = ref(false)
 const isLoadingUserTests = ref(false)
 
 const runTestsStatus = ref<string | null>(null)
 const runTestsResultsOutput = ref<string | null>(null)
-const customTestResults = ref<Array<{ id: number; index: number; status: string; output?: string; error?: string; expected?: string; got?: string }>>([])
 
 const submitStatus = ref<string | null>(null)
 const submitResultsOutput = ref<string | null>(null)
@@ -186,358 +178,235 @@ const totalTests = ref<number | null>(null)
 
 const activeTab = ref('description')
 
+// Custom Test Cases (existing, might need to be adapted or integrated with fetched examples)
 interface CustomTestCase {
-  id: number;
-  numsInput: string;
-  targetInput: string;
+  id: number
+  numsInput: string
+  targetInput: string
 }
-let nextTestCaseId = ref(1);
+let nextTestCaseId = ref(1)
 const customTestCases = ref<CustomTestCase[]>([
   { id: nextTestCaseId.value++, numsInput: '[2, 7, 11, 15]', targetInput: '9' },
-]);
-const selectedTestCaseId = ref(customTestCases.value[0].id);
+])
+const selectedTestCaseId = ref(customTestCases.value[0].id)
 
 const editorInstance = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 const handleEditorMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
   editorInstance.value = editor
 }
 
-const code = ref(`from typing import List
+const code = ref('')
 
-def two_sum(nums: List[int], target: int) -> List[int]:
-    """
-    Given an array of integers nums and an integer target, return indices
-    of the two numbers such that they add up to target.
-
-    You may assume that each input would have exactly one solution,
-    and you may not use the same element twice.
-
-    You can return the answer in any order.
-
-    Args:
-        nums: A list of integers.
-        target: The target sum.
-
-    Returns:
-        A list containing the indices of the two numbers.
-        Return an empty list if no solution is found.
-    """
-    # --- WRITE YOUR SOLUTION HERE ---
-
-    pass # Remove this line and implement your solution
-
-    # --- END OF SOLUTION ---
-`)
-
-const description = `Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.
-
-You may assume that each input would have exactly one solution, and you may not use the same element twice.
-
-You can return the answer in any order.`
-
-const examples = [
-  {
-    input: 'nums = [2,7,11,15], target = 9',
-    output: '[0,1]',
-  },
-  {
-    input: 'nums = [3,2,4], target = 6',
-    output: '[1,2]',
-  },
-  {
-    input: 'nums = [3,3], target = 6',
-    output: '[0,1]',
-  },
-]
-
-const constraints = [
-  '2 <= nums.length <= 104',
-  '-109 <= nums[i] <= 109',
-  '-109 <= target <= 109',
-  'Only one valid answer exists.',
-]
-
-const renderedDescription = computed(() => marked(description))
-
-const editorOptions = {
-  minimap: { enabled: false },
-  fontSize: 14,
-  lineNumbers: 'on' as const,
-  roundedSelection: false,
-  scrollBeyondLastLine: false,
+const editorOptions = ref<monaco.editor.IStandaloneEditorConstructionOptions>({
   automaticLayout: true,
-}
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  fontSize: 14,
+  renderWhitespace: 'boundary' as monaco.editor.IStandaloneEditorConstructionOptions['renderWhitespace'],
+  wordWrap: 'on' as monaco.editor.IStandaloneEditorConstructionOptions['wordWrap'],
+})
 
-const BACKEND_PROXY_URL = 'http://localhost:3000'
-
-const formatStdin = (numsStr: string, targetStr: string): string | null => {
-  let formattedNums = numsStr.trim();
-  if (!formattedNums.startsWith('[') || !formattedNums.endsWith(']')) {
-      if (!formattedNums.includes('[') && formattedNums.includes(',')) {
-          formattedNums = `[${formattedNums}]`;
-      } else {
-          console.warn('Cannot reliably format nums input into a list.');
-          return null;
-      }
-  }
+// Fetch problem details when slug changes or on mount
+async function fetchProblemDetails(slug: string) {
+  if (!slug) return
+  isLoadingProblem.value = true
+  problemError.value = null
+  problemDetails.value = null // Reset previous problem details
   try {
-    JSON.parse(formattedNums);
-  } catch { 
-    console.error('Nums input is not valid JSON'); 
-    return null;
+    const data = await judge0Service.getProblemDetails(slug as string)
+    problemDetails.value = data
+    code.value = data.function_signature || '' // Set editor code
+    // Reset submission status from previous problem
+    submitStatus.value = null
+    submitResultsOutput.value = null
+    submitTime.value = null
+    submitMemory.value = null
+    passedTests.value = null
+    totalTests.value = null
+    runTestsStatus.value = null
+    runTestsResultsOutput.value = null
+    activeTab.value = 'description' // Default to description tab
+  } catch (err) {
+    console.error(`Failed to load problem details for ${slug}:`, err)
+    problemError.value = `Failed to load problem details. Please check the slug or try again. (${err instanceof Error ? err.message : 'Unknown error'})`
+  } finally {
+    isLoadingProblem.value = false
   }
-  if (isNaN(parseInt(targetStr.trim()))) { 
-    console.error('Target input is not a valid number'); 
-    return null; 
-  }
-
-  return `${formattedNums}\n${targetStr.trim()}`;
-};
-
-const clearResults = () => {
-  runTestsStatus.value = null;
-  runTestsResultsOutput.value = null;
-  customTestResults.value = [];
-
-  submitStatus.value = null;
-  submitResultsOutput.value = null;
-  submitTime.value = null;
-  submitMemory.value = null;
-  passedTests.value = null;
-  totalTests.value = null;
 }
 
-const addTestCase = () => {
-  if (customTestCases.value.length < 5) {
-    const newId = nextTestCaseId.value++;
-    customTestCases.value.push({ id: newId, numsInput: '', targetInput: '' });
-    selectedTestCaseId.value = newId;
+watchEffect(() => {
+  const slug = route.params.slug
+  if (slug) {
+    fetchProblemDetails(slug as string)
   }
-};
+})
 
-const deleteSelectedTestCase = () => {
-  if (customTestCases.value.length > 1) {
-    const indexToDelete = customTestCases.value.findIndex(tc => tc.id === selectedTestCaseId.value);
-    if (indexToDelete !== -1) {
-      customTestCases.value.splice(indexToDelete, 1);
-      if (indexToDelete > 0) {
-        selectedTestCaseId.value = customTestCases.value[indexToDelete - 1].id;
-      } else if (customTestCases.value.length > 0) {
-        selectedTestCaseId.value = customTestCases.value[0].id;
+function goBack() {
+  router.push('/') // Or router.back() if preferred
+}
+
+function statusClass(status: string | null) {
+  if (!status) return ''
+  if (status.toLowerCase().includes('accepted')) return 'status-accepted'
+  if (status.toLowerCase().includes('error') || status.toLowerCase().includes('wrong')) return 'status-error'
+  if (status.toLowerCase().includes('compilation')) return 'status-compilation-error'
+  return 'status-processing'
+}
+
+async function runCode() {
+  if (!editorInstance.value || !problemDetails.value) return
+  isLoading.value = true
+  submitStatus.value = 'Submitting...'
+  submitResultsOutput.value = null
+  submitTime.value = null
+  submitMemory.value = null
+  passedTests.value = null
+  totalTests.value = null
+
+  const currentCode = editorInstance.value.getValue()
+  try {
+    // Assuming Python (language_id: 71) for now
+    const result = await judge0Service.runTests(problemDetails.value.slug, 71, currentCode)
+
+    submitStatus.value = result.status
+    submitTime.value = result.time
+    submitMemory.value = result.memory?.toString() || null // Ensure memory is string or null
+    passedTests.value = result.passedTests
+    totalTests.value = result.totalTests
+
+    if (result.status === 'Accepted') {
+      submitResultsOutput.value = result.output || 'All tests passed!'
+    } else {
+      submitResultsOutput.value = `${result.error || 'An error occurred.'}\n`
+      if (result.details) {
+        submitResultsOutput.value += `Input: ${JSON.stringify(result.details.input)}\n`
+        if (result.details.expected !== undefined) {
+          submitResultsOutput.value += `Expected: ${JSON.stringify(result.details.expected)}\n`
+        }
+        if (result.details.got !== undefined) {
+          submitResultsOutput.value += `Got: ${JSON.stringify(result.details.got)}\n`
+        }
+         if (result.details.error && typeof result.details.error === 'string' && !submitResultsOutput.value.includes(result.details.error)) {
+           submitResultsOutput.value += `Details: ${result.details.error}`
+        }
       }
     }
+  } catch (error: any) {
+    console.error('Submission error:', error)
+    submitStatus.value = 'Submission Failed'
+    submitResultsOutput.value = error.response?.data?.error || error.message || 'An unknown error occurred during submission.'
+  } finally {
+    isLoading.value = false
+    activeTab.value = 'submissions'
   }
-};
+}
 
-const runCode = async () => {
-  if (!editorInstance.value) {
-    console.error('Editor instance not available.')
-    submitResultsOutput.value = 'Error: Editor not ready.'
-    submitStatus.value = 'Error'
+async function runUserTests() {
+  if (!editorInstance.value || !problemDetails.value) return
+
+  const selectedTest = customTestCases.value.find(tc => tc.id === selectedTestCaseId.value)
+  if (!selectedTest) {
+    runTestsStatus.value = "No test case selected or found."
+    runTestsResultsOutput.value = ""
     return
   }
 
-  isLoading.value = true
-  clearResults()
-  submitStatus.value = 'Submitting...'
-  activeTab.value = 'submissions'
+  // TODO: Generalize stdin creation based on problem type
+  // For now, assuming 'two-sum' structure for custom test cases
+  const stdin = `${selectedTest.numsInput}\n${selectedTest.targetInput}`
 
-  const userSolutionCode = editorInstance.value.getValue()
-  const problemId = 'two-sum'
+  isLoadingUserTests.value = true
+  runTestsStatus.value = 'Running...'
+  runTestsResultsOutput.value = null
 
+  const currentCode = editorInstance.value.getValue()
   try {
-    const response = await axios.post(`${BACKEND_PROXY_URL}/api/run-tests`, {
-      problem_id: problemId,
-      language_id: 71,
-      user_code: userSolutionCode,
-    })
-    console.log('Backend Submit Response:', response.data)
+    // Assuming Python (language_id: 71)
+    const result = await judge0Service.submitCode(currentCode, 71, stdin)
 
-    submitStatus.value = response.data.status || 'Unknown Status'
-    submitTime.value = response.data.time ? `${response.data.time}s` : null
-    submitMemory.value = response.data.memory ? `${(response.data.memory / 1024).toFixed(2)} MB` : null
-    passedTests.value = response.data.passedTests
-    totalTests.value = response.data.totalTests
-
-    if (response.data.status === 'Accepted') {
-      submitResultsOutput.value = response.data.output || 'Accepted'
+    runTestsStatus.value = result.status.description
+    if (result.status.id === 3) { // Accepted
+      runTestsResultsOutput.value = `Output:\n${result.stdout || '(No output)'}`
+    } else if (result.compile_output) {
+      runTestsResultsOutput.value = `Compilation Error:\n${result.compile_output}`
+    } else if (result.stderr) {
+      runTestsResultsOutput.value = `Runtime Error:\n${result.stderr}`
+    } else if (result.message) {
+      runTestsResultsOutput.value = `Message:\n${result.message}`
     } else {
-      let failureMsg = response.data.error || 'Execution failed.'
-      if (response.data.details) {
-        failureMsg += `\n---\nDetails:\n`
-        if (response.data.details.input) {
-          failureMsg += `Input: ${JSON.stringify(response.data.details.input)}\n`
-        }
-        if (response.data.details.error && typeof response.data.details.error === 'string') {
-           if (!failureMsg.includes(response.data.details.error)) {
-                 failureMsg += `Error Info: ${response.data.details.error}\n`
-            }
-        }
-      }
-      submitResultsOutput.value = failureMsg;
+      runTestsResultsOutput.value = `Status: ${result.status.description}`
     }
   } catch (error: any) {
-    console.error('Error submitting code:', error)
-    submitStatus.value = error.response?.data?.status || 'Submission Failed'
-    submitResultsOutput.value = `Error: ${error.response?.data?.error || error.message || 'Unknown network or backend error'}`
+    console.error('Run user tests error:', error)
+    runTestsStatus.value = 'Test Run Failed'
+    runTestsResultsOutput.value = error.response?.data?.error || error.message || 'An unknown error occurred.'
   } finally {
-    isLoading.value = false
+    isLoadingUserTests.value = false
+    activeTab.value = 'testcase'
   }
 }
 
-const runUserTests = async () => {
-  if (!editorInstance.value) return;
-  isLoadingUserTests.value = true;
-  clearResults();
-  runTestsStatus.value = 'Running Custom Tests...';
-  activeTab.value = 'testcase';
+function addTestCase() {
+  if (customTestCases.value.length < 5) {
+    const newId = nextTestCaseId.value++
+    customTestCases.value.push({ id: newId, numsInput: '', targetInput: '' })
+    selectedTestCaseId.value = newId // Auto-select the new test case
+  }
+}
 
-  const userCode = editorInstance.value.getValue();
-  const results: typeof customTestResults.value = [];
-  let overallStatus = "All Passed";
-
-  for (let i = 0; i < customTestCases.value.length; i++) {
-    const testCase = customTestCases.value[i];
-    const currentTestIndex = i + 1;
-    runTestsStatus.value = `Running Custom Test ${currentTestIndex}/${customTestCases.value.length}...`;
-
-    const stdin = formatStdin(testCase.numsInput, testCase.targetInput);
-    if (!stdin) {
-      results.push({ id: testCase.id, index: currentTestIndex, status: 'Input Error', error: 'Invalid input format for Nums or Target.' });
-      overallStatus = "Input Error";
-      continue;
-    }
-
-    try {
-      const [userResult, correctResult] = await Promise.all([
-        axios.post(`${BACKEND_PROXY_URL}/api/submit`, { language_id: 71, source_code: userCode, stdin: stdin }),
-        axios.post(`${BACKEND_PROXY_URL}/api/submit`, { language_id: 71, source_code: correctSolutionCode, stdin: stdin })
-      ]);
-
-      console.log(`Custom Test ${currentTestIndex} User Result:`, userResult.data);
-      console.log(`Custom Test ${currentTestIndex} Correct Result:`, correctResult.data);
-
-      const userStatusId = userResult.data?.status?.id;
-      const correctStatusId = correctResult.data?.status?.id;
-
-      if (correctStatusId !== 3) {
-          results.push({ id: testCase.id, index: currentTestIndex, status: 'System Error', error: `Correct solution failed (Status: ${correctResult.data?.status?.description}). Check test input or backend.`, output: `Correct stderr: ${correctResult.data?.stderr}` });
-          overallStatus = "System Error";
-          continue;
-      }
-
-      if (userStatusId !== 3) {
-         results.push({ id: testCase.id, index: currentTestIndex, status: userResult.data?.status?.description || 'Failed', error: `Execution failed.`, output: `stderr: ${userResult.data?.stderr || userResult.data?.compile_output || ''}` });
-         overallStatus = userResult.data?.status?.description || 'Failed';
-         continue;
-      }
-
-      const userOutput = userResult.data.stdout?.trim();
-      const correctOutput = correctResult.data.stdout?.trim();
-
-      if (userOutput === correctOutput) {
-        results.push({ id: testCase.id, index: currentTestIndex, status: 'Passed', output: userOutput });
+function deleteSelectedTestCase() {
+  if (customTestCases.value.length > 1) {
+    const indexToDelete = customTestCases.value.findIndex(tc => tc.id === selectedTestCaseId.value)
+    if (indexToDelete !== -1) {
+      customTestCases.value.splice(indexToDelete, 1)
+      // Select the first test case if the deleted one was selected
+      if (customTestCases.value.length > 0) {
+        selectedTestCaseId.value = customTestCases.value[0].id
       } else {
-        results.push({ id: testCase.id, index: currentTestIndex, status: 'Wrong Answer', expected: correctOutput, got: userOutput });
-        overallStatus = "Wrong Answer";
+        // This case should ideally not be reached if "Delete" is disabled for <=1
+        addTestCase() // Add a new one if all are deleted (though button is disabled)
       }
-
-    } catch (error: any) {
-      console.error(`Error running custom test case ${currentTestIndex}:`, error);
-      results.push({ id: testCase.id, index: currentTestIndex, status: 'Network/Server Error', error: error.message });
-      overallStatus = "Network/Server Error";
     }
   }
+}
 
-  customTestResults.value = results;
-  runTestsStatus.value = overallStatus;
-
-  let summary = `Finished running ${customTestCases.value.length} custom tests.
-Status: ${overallStatus}
-
-`;
-  results.forEach(r => {
-      summary += `Test Case ${r.index}: ${r.status}
-`;
-      if (r.status !== 'Passed') {
-          if (r.expected) summary += `  Expected: ${r.expected}
-`;
-          if (r.got) summary += `  Got: ${r.got}
-`;
-          if (r.error) summary += `  Error: ${r.error}
-`;
-          if (r.output) summary += `  Output/stderr: ${r.output}
-`;
-      }
-       summary += `----\n`;
-  });
-  runTestsResultsOutput.value = summary;
-
-  isLoadingUserTests.value = false;
-};
-
-const statusClass = (currentStatus: string | null) => {
-  if (!currentStatus) return '';
-  if (currentStatus === 'Accepted' || currentStatus === 'All Passed') return 'status-accepted';
-  if (currentStatus === 'Input Error' || currentStatus === 'Configuration Error' || currentStatus === 'System Error' || currentStatus === 'Network/Server Error') return 'status-error';
-  if (currentStatus.includes('Error') || currentStatus.includes('Failed') || currentStatus.includes('Wrong')) return 'status-error';
-  if (currentStatus.startsWith('Submitting') || currentStatus.startsWith('Running')) return 'status-submitting';
-  return 'status-other';
-};
-
-const correctSolutionCode = `
-from typing import List
-
-def two_sum(nums: List[int], target: int) -> List[int]:
-    seen = {}
-    for i, num in enumerate(nums):
-        complement = target - num
-        if complement in seen:
-            # Ensure indices are sorted for consistent comparison
-            res = sorted([seen[complement], i]) 
-            return res
-        seen[num] = i
-    # According to problem constraints, a solution always exists,
-    # but return empty list as a fallback (though it shouldn't be reached)
-    return []
-`;
 </script>
 
 <style scoped>
 .problem-view {
-  height: 100vh;
-  width: 100vw;
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  overflow: hidden; /* Prevent scrolling of the entire page */
 }
 
 .problem-header {
-  padding: 10px 16px;
-  background-color: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
-  height: 50px;
+  padding: 10px 20px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
   display: flex;
   align-items: center;
+  height: 50px; /* Fixed height */
+  flex-shrink: 0;
 }
 
 .back-button {
   background: none;
   border: none;
-  color: #666;
-  font-size: 0.9rem;
+  color: #007bff;
   cursor: pointer;
-  padding: 6px 12px;
+  font-size: 1rem;
+  padding: 5px 10px;
   border-radius: 4px;
   transition: background-color 0.2s;
 }
 
 .back-button:hover {
-  background-color: #e0e0e0;
+  background-color: #e9ecef;
 }
 
-.splitpanes {
-  flex-grow: 1;
+.splitpanes.default-theme {
+  /* Height is set inline for now, calc(100vh - 70px) */
 }
 
 .left-pane-content {
@@ -545,272 +414,228 @@ def two_sum(nums: List[int], target: int) -> List[int]:
   flex-direction: column;
   height: 100%;
   background-color: #fff;
+  overflow-y: hidden; /* Prevent this pane from scrolling, content will scroll */
 }
 
 .left-pane-toolbar {
   display: flex;
-  border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
+  border-bottom: 1px solid #dee2e6;
+  padding: 0 10px;
+  flex-shrink: 0; /* Prevent toolbar from shrinking */
 }
 
 .tab-button {
-  padding: 10px 12px;
-  background: none;
+  padding: 10px 15px;
   border: none;
-  border-bottom: 2px solid transparent;
+  background: none;
   cursor: pointer;
   font-size: 0.9rem;
-  color: #666;
+  color: #495057;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; /* Overlap with pane border */
 }
 
 .tab-button.active {
-  border-bottom-color: #00af9b;
-  color: #00af9b;
-  font-weight: 600;
+  color: #007bff;
+  border-bottom-color: #007bff;
+  font-weight: bold;
 }
 
 .tab-content {
+  padding: 20px;
   flex-grow: 1;
-  overflow-y: auto;
-  padding: 15px;
-  display: flex;
-  flex-direction: column;
-}
-
-.testcase-results-content {
-    /* Container for testcase management and results */
-}
-
-.testcase-toolbar {
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
-  display: flex;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.testcase-toolbar button {
-  padding: 5px 10px;
-  font-size: 0.85rem;
-  background-color: #e0e0e0;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.testcase-toolbar button:hover:not(:disabled) {
-  background-color: #d5d5d5;
-}
-
-.testcase-toolbar button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.custom-testcases-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 15px;
-  flex-shrink: 0;
-}
-
-.testcase-item {
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 10px;
-  display: flex;
-  align-items: flex-start;
-  background-color: #f9f9f9;
-}
-
-.testcase-item.selected {
-  border-color: #00af9b;
-  background-color: #e6f7f5;
-}
-
-.testcase-radio {
-  margin-right: 10px;
-  margin-top: 5px;
-  flex-shrink: 0;
-}
-
-.testcase-label {
-    font-weight: 600;
-    margin-right: 15px;
-    min-width: 80px;
-    margin-top: 8px;
-    flex-shrink: 0;
-    cursor: pointer;
-}
-
-.testcase-inputs {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex-grow: 1;
-}
-
-.input-group {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.input-group label {
-    font-size: 0.85rem;
-    min-width: 50px;
-    text-align: right;
-}
-
-.input-group input[type="text"] {
-    flex-grow: 1;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    padding: 4px 6px;
-    font-family: monospace;
-    font-size: 0.9rem;
-}
-
-.results-panel {
-    background-color: #f0f0f0;
-    color: #333;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 150px;
-    padding: 10px 15px;
-    margin-top: 15px;
-}
-
-.results-run-tests h3 {
-    font-size: 1rem;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 5px;
-    margin-bottom: 8px;
-    color: #333;
-    flex-shrink: 0;
-}
-
-.results-run-tests > div { margin-bottom: 5px; flex-shrink: 0; }
-
-.results-run-tests pre {
-    background-color: #fff;
-    border: 1px solid #e0e0e0;
-    color: #333;
-    flex-grow: 1;
-    min-height: 50px;
-    overflow-y: auto;
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 4px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-size: 0.85rem;
-}
-
-.results-submission {
-    background-color: #f0f0f0;
-    color: #333;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 150px;
-    padding: 10px 15px;
-    margin-top: 15px;
-}
-
-.results-submission h3 {
-    font-size: 1rem;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 5px;
-    margin-bottom: 8px;
-    color: #333;
-    flex-shrink: 0;
-}
-
-.results-submission > div { margin-bottom: 5px; flex-shrink: 0; }
-
-.results-submission pre {
-    background-color: #fff;
-    border: 1px solid #e0e0e0;
-    color: #333;
-    flex-grow: 1;
-    min-height: 50px;
-    overflow-y: auto;
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 4px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-size: 0.85rem;
-}
-
-.no-submission-placeholder {
-    padding: 20px;
-    text-align: center;
-    color: #777;
-    font-style: italic;
+  overflow-y: auto; /* Allow content within tab to scroll */
 }
 
 .editor-section {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #1e1e1e;
+  background-color: #1e1e1e; /* Editor background color */
 }
 
 .editor-header {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background-color: #1e1e1e;
+  justify-content: flex-end;
+  padding: 10px;
+  background-color: #252526; /* Slightly lighter than editor bg */
   border-bottom: 1px solid #333;
   flex-shrink: 0;
 }
 
 .run-button {
-  background-color: #00af9b;
-  color: white;
+  padding: 8px 15px;
+  margin-left: 10px;
   border: none;
-  padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.9em;
   transition: background-color 0.2s;
 }
-
-.run-button:hover:not(:disabled) {
-  background-color: #009688;
-}
-
 .run-button:disabled {
-  background-color: #666;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-.editor-container {
-  flex-grow: 1;
-  background-color: #1e1e1e;
-  min-height: 0;
+.run-tests-button {
+  background-color: #4CAF50; /* Green */
+  color: white;
+}
+.run-tests-button:hover:not(:disabled) {
+  background-color: #45a049;
 }
 
 .submit-button {
-    /* background-color: #007bff; */
+  background-color: #007bff; /* Blue */
+  color: white;
+}
+.submit-button:hover:not(:disabled) {
+  background-color: #0056b3;
 }
 
-.results-panel.results-run-tests .custom-test-result {
-    margin-bottom: 5px;
-    padding-bottom: 5px;
-    border-bottom: 1px dashed #eee;
+.editor-container {
+  flex-grow: 1; /* Editor takes remaining space */
+  overflow: hidden; /* Important for Monaco editor to not overflow */
 }
-.results-panel.results-run-tests .custom-test-result:last-child {
-    border-bottom: none;
+
+.results-panel {
+  padding: 16px;
+  background-color: #252526;
+  color: #ccc;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+  line-height: 1.4;
+  overflow-y: auto;
+  border-top: 1px solid #333; /* if it's below testcase inputs */
 }
+.results-panel h3 {
+    margin-top: 0;
+    font-size: 1.1em;
+    color: #ddd;
+    margin-bottom: 10px;
+}
+.results-panel pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background-color: #1e1e1e; /* Match editor bg */
+  padding: 10px;
+  border-radius: 4px;
+}
+.results-panel div span { /* For status highlighting */
+    font-weight: bold;
+}
+.status-accepted { color: #5cb85c; }
+.status-error { color: #d9534f; }
+.status-compilation-error { color: #f0ad4e; }
+.status-processing { color: #777; }
+
+.no-submission-placeholder {
+    text-align: center;
+    color: #777;
+    padding: 30px;
+}
+
+/* For loading problem details */
+.loading-problem-message, .error-problem-message {
+  text-align: center;
+  padding: 40px;
+  font-size: 1.2em;
+  color: #555;
+}
+.error-problem-message {
+  color: #d9534f;
+  background-color: #f2dede;
+  border: 1px solid #ebccd1;
+  border-radius: 4px;
+  margin: 20px;
+}
+
+
+/* Test Case Specific Styles */
+.testcase-results-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Ensure it tries to fill parent if possible */
+}
+.testcase-toolbar {
+  padding-bottom: 15px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  gap: 10px;
+}
+.testcase-toolbar button {
+  padding: 8px 12px;
+  border: 1px solid #555;
+  background-color: #3e3e3e;
+  color: #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.testcase-toolbar button:hover:not(:disabled) {
+  background-color: #4a4a4a;
+}
+.testcase-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+.custom-testcases-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.testcase-item {
+  padding: 10px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  background-color: #2a2a2a;
+}
+.testcase-item.selected {
+  border-color: #007bff;
+  background-color: #30353b;
+}
+
+.testcase-radio {
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.testcase-label {
+  font-weight: bold;
+  color: #ddd;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.testcase-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.input-group {
+  display: flex;
+  flex-direction: column;
+}
+.input-group label {
+  font-size: 0.85em;
+  color: #aaa;
+  margin-bottom: 3px;
+}
+.input-group input[type="text"] {
+  padding: 6px 8px;
+  background-color: #1e1e1e;
+  border: 1px solid #444;
+  color: #ccc;
+  border-radius: 3px;
+  font-family: 'Courier New', Courier, monospace;
+}
+.results-run-tests {
+    /* This panel might need a max-height if custom-testcases-list doesn't fill remaining space well */
+    /* Or a fixed height, or let the parent scroll if it's too much content */
+    flex-shrink: 0; /* Prevent it from shrinking if content above is large */
+}
+
 </style>

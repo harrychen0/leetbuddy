@@ -1,10 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import HomePage from '@/views/HomePage.vue';
+import ProblemListView from '@/views/ProblemListView.vue';
 import ProblemView from '@/views/ProblemView.vue';
 
 const routes = [
-  { path: '/', component: HomePage },
-  { path: '/problem/:id', component: ProblemView, props: true },
+  { path: '/', component: ProblemListView },
+  { path: '/problem/:slug', component: ProblemView, props: true },
 ];
 
 const router = createRouter({

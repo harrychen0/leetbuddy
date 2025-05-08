@@ -1,0 +1,25 @@
+{
+  "slug": "add-two-numbers",
+  "title": "Add Two Numbers",
+  "difficulty": "Medium",
+  "description": "You are given two non-empty arrays representing two non-negative integers. The digits are stored in reverse order, and each element contains a single digit.\\n\\nAdd the two numbers and return the sum as an array in the same format (digits in reverse order).\\n\\nYou may assume the two numbers do not contain any leading zero, except the number 0 itself.",
+  "functionSignature": "def add_two_numbers(l1: list[int], l2: list[int]) -> list[int]:\\n    \\\"\\\"\\\"\\n    Adds two numbers represented by reversed arrays of digits.\\n\\n    Args:\\n        l1: The first number as a reversed array of digits.\\n        l2: The second number as a reversed array of digits.\\n\\n    Returns:\\n        The sum as a reversed array of digits.\\n    \\\"\\\"\\\"\\n    # --- WRITE YOUR SOLUTION HERE ---\\n\\n    pass\\n\\n    # --- END OF SOLUTION ---",
+  "examples": [
+    { "inputDescription": "l1 = [2,4,3], l2 = [5,6,4]", "outputDescription": "[7,0,8]", "explanation": "342 + 465 = 807.", "order": 1 },
+    { "inputDescription": "l1 = [0], l2 = [0]", "outputDescription": "[0]", "order": 2 },
+    { "inputDescription": "l1 = [9,9,9,9,9,9,9], l2 = [9,9,9,9]", "outputDescription": "[8,9,9,9,0,0,0,1]", "order": 3 }
+  ],
+  "constraints": [
+    { "text": "The number of nodes in each linked list is in the range [1, 100].", "order": 1 },
+    { "text": "0 <= Node.val <= 9", "order": 2 },
+    { "text": "It is guaranteed that the list represents a number that does not have leading zeros.", "order": 3 }
+  ],
+  "testCases": [
+    { "inputData": {"l1": [2,4,3], "l2": [5,6,4]}, "expectedOutput": [7,0,8], "isHidden": false, "order": 1 },
+    { "inputData": {"l1": [0], "l2": [0]}, "expectedOutput": [0], "isHidden": false, "order": 2 },
+    { "inputData": {"l1": [9,9,9,9,9,9,9], "l2": [9,9,9,9]}, "expectedOutput": [8,9,9,9,0,0,0,1], "isHidden": false, "order": 3 },
+    { "inputData": {"l1": [5], "l2": [5]}, "expectedOutput": [0,1], "isHidden": true, "order": 4 },
+    { "inputData": {"l1": [1,0,0,0,0,0,1], "l2": [5,6,4]}, "expectedOutput": [6,6,4,0,0,0,1], "isHidden": true, "order": 5 },
+    { "inputData": {"l1": [1,8], "l2": [0]}, "expectedOutput": [1,8], "isHidden": true, "order": 6 }
+  ]
+} 

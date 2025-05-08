@@ -1,0 +1,37 @@
+# docker-compose.override.yml
+# Development specific overrides
+
+services:
+  backend:
+    build:
+      context: ./backend
+      target: development # Use the development stage from backend/Dockerfile
+    volumes:
+      # Mount local source code into the container
+      - ./backend:/app/backend
+      # Mount an anonymous volume over node_modules to prevent conflicts
+      - /app/backend/node_modules
+    # Port 3000 is already mapped in the base docker-compose.yml
+    # Command is already set to 'npm run dev' in the development stage
+    # depends_on db:service_healthy is still good
+
+  frontend:
+    build:
+      context: ./frontend
+      target: development # Use the development stage from frontend/Dockerfile
+    ports:
+      # Expose the Vite dev server port (default 5173)
+      - "5173:5173"
+      # Remove the production port mapping if necessary (though keeping it usually doesn't hurt)
+      # - "8080:80" # Commented out/removed as Nginx isn't running in dev
+    volumes:
+      # Mount local source code into the container
+      - ./frontend:/app/frontend
+      # Mount an anonymous volume over node_modules
+      - /app/frontend/node_modules
+    # Command is already set to 'npm run dev -- --host 0.0.0.0' in the development stage
+    # depends_on backend:service_started is still good
+
+  # db service typically doesn't need overrides for development
+  # healthcheck and volumes from base file are used
+# volumes section from base file is implicitly included

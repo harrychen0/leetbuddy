@@ -3,10 +3,127 @@ import express, { Request, Response, NextFunction } from 'express';
 import axios from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { Pool } from 'pg'; // Import the pg Pool
+import fs from 'fs/promises'; // For reading files asynchronously
+import path from 'path'; // For handling file paths
 
 // Load environment variables from .env file
 // Make sure the .env file is in the root of the *project*, not the backend directory
 dotenv.config({ path: '../.env' });
+
+// --- Database Configuration --- 
+const dbPool = new Pool({
+  user: process.env.POSTGRES_USER,
+  host: process.env.POSTGRES_HOST, // Service name from docker-compose
+  database: process.env.POSTGRES_DB,
+  password: process.env.POSTGRES_PASSWORD,
+  port: parseInt(process.env.POSTGRES_PORT || '5432'), // Default PG port
+});
+
+// --- Problem Data Type Interface ---
+interface ProblemExample {
+  inputDescription: string;
+  outputDescription: string;
+  explanation?: string;
+  order: number;
+}
+
+interface ProblemConstraint {
+  text: string;
+  order: number;
+}
+
+interface ProblemTestCase {
+  inputData: any;
+  expectedOutput: any;
+  isHidden: boolean;
+  order: number;
+}
+
+interface ProblemData {
+  slug: string;
+  title: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  description: string;
+  functionSignature: string;
+  examples: ProblemExample[];
+  constraints: ProblemConstraint[];
+  testCases: ProblemTestCase[];
+}
+// --- End Problem Data Type ---
+
+// --- Database Seeding Logic --- 
+async function seedDatabase() {
+  console.log('Checking database seeding...');
+  const client = await dbPool.connect();
+  try {
+    const problemDataDir = path.join(__dirname, 'problem_data');
+    const files = await fs.readdir(problemDataDir);
+
+    for (const file of files) {
+      if (path.extname(file) === '.json') {
+        const filePath = path.join(problemDataDir, file);
+        const fileContent = await fs.readFile(filePath, 'utf-8');
+        const problemData: ProblemData = JSON.parse(fileContent);
+
+        const existingProblem = await client.query('SELECT id FROM problems WHERE slug = $1', [problemData.slug]);
+
+        if (existingProblem.rows.length === 0) {
+          console.log(`Seeding problem: ${problemData.title} (${problemData.slug})...`);
+          await client.query('BEGIN');
+          try {
+            const problemInsertRes = await client.query(
+              'INSERT INTO problems (slug, title, difficulty, description, function_signature) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+              [problemData.slug, problemData.title, problemData.difficulty, problemData.description, problemData.functionSignature]
+            );
+            const problemId = problemInsertRes.rows[0].id;
+
+            for (const example of problemData.examples) {
+              await client.query(
+                'INSERT INTO problem_examples (problem_id, input_description, output_description, explanation, "order") VALUES ($1, $2, $3, $4, $5)',
+                [problemId, example.inputDescription, example.outputDescription, example.explanation, example.order]
+              );
+            }
+
+            for (const constraint of problemData.constraints) {
+              await client.query(
+                'INSERT INTO problem_constraints (problem_id, text, "order") VALUES ($1, $2, $3)',
+                [problemId, constraint.text, constraint.order]
+              );
+            }
+
+            for (const testCase of problemData.testCases) {
+              await client.query(
+                'INSERT INTO problem_test_cases (problem_id, input_data, expected_output, is_hidden, "order") VALUES ($1, $2, $3, $4, $5)',
+                [problemId, JSON.stringify(testCase.inputData), JSON.stringify(testCase.expectedOutput), testCase.isHidden, testCase.order]
+              );
+            }
+            await client.query('COMMIT');
+            console.log(`Successfully seeded problem: ${problemData.title}`);
+          } catch (seedError) {
+            await client.query('ROLLBACK');
+            console.error(`Error seeding problem ${problemData.title}:`, seedError);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error during seeding process:', err);
+  } finally {
+    client.release();
+    console.log('Database seeding check complete.');
+  }
+}
+// --- End Database Seeding --- 
+
+// Test DB connection and then seed
+dbPool.query('SELECT NOW()')
+  .then(async () => {
+    console.log('Database connected successfully.');
+    await seedDatabase(); // Now seedDatabase is defined
+  })
+  .catch(err => console.error('Database connection error:', err.stack));
+// --- End Database Config ---
 
 const app = express();
 const port = process.env.BACKEND_PORT || 3000;
@@ -201,10 +318,10 @@ app.post('/api/submit', asyncHandler(async (req: Request, res: Response, next: N
 
 // --- Endpoint: /api/run-tests (No changes needed here) ---
 app.post('/api/run-tests', asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const { problem_id, language_id, user_code } = req.body;
+  const { problem_slug, language_id, user_code } = req.body;
 
-  if (!problem_id || !language_id || !user_code) {
-     res.status(400).json({ status: 'Error', error: 'Missing problem_id, language_id, or user_code.' });
+  if (!problem_slug || !language_id || !user_code) {
+     res.status(400).json({ status: 'Error', error: 'Missing problem_slug, language_id, or user_code.' });
      return; // Exit after sending response
   }
 
@@ -213,10 +330,31 @@ app.post('/api/run-tests', asyncHandler(async (req: Request, res: Response, next
      return; // Exit after sending response
   }
 
-  const tests = problemTestCases[problem_id];
-  if (!tests) {
-    res.status(404).json({ status: 'Error', error: `Problem '${problem_id}' not found or has no test cases.` });
-    return; // Exit after sending response
+  let problemId: number;
+  let tests: any[];
+
+  try {
+    // Fetch problem ID and test cases from DB
+    const problemRes = await dbPool.query('SELECT id FROM problems WHERE slug = $1', [problem_slug]);
+    if (problemRes.rows.length === 0) {
+      res.status(404).json({ status: 'Error', error: `Problem with slug '${problem_slug}' not found.` });
+      return;
+    }
+    problemId = problemRes.rows[0].id;
+
+    const testsRes = await dbPool.query(
+      'SELECT input_data, expected_output FROM problem_test_cases WHERE problem_id = $1 ORDER BY "order" ASC',
+      [problemId]
+    );
+    tests = testsRes.rows;
+
+    if (!tests || tests.length === 0) {
+      res.status(404).json({ status: 'Error', error: `No test cases found for problem '${problem_slug}'.` });
+      return;
+    }
+  } catch (dbError: any) {
+    console.error("Database error fetching test cases:", dbError);
+    return next(dbError); // Pass DB error to global handler
   }
 
   let overallStatus = 'Accepted';
@@ -226,14 +364,16 @@ app.post('/api/run-tests', asyncHandler(async (req: Request, res: Response, next
   let firstFailureDetails: any = null;
   let passedTests = 0; // Keep track of passed tests
 
-  console.log(`Running ${tests.length} tests for problem '${problem_id}'...`);
+  console.log(`Running ${tests.length} tests for problem '${problem_slug}' (ID: ${problemId})...`);
 
   for (let i = 0; i < tests.length; i++) {
     const test = tests[i];
-    const testInput = test.input;
+    const testInputData = test.input_data; // JSONB from DB
+    const testExpectedOutput = test.expected_output; // JSONB from DB
 
     // Construct the specific Python code for this test case
-    // This assumes the user code provides a function named 'two_sum'
+    // Assumes input_data is like { "nums": [...], "target": ... }
+    // TODO: Adapt this based on actual problem input structure if needed
     const testExecutionCode = `
 ${user_code}
 
@@ -242,8 +382,8 @@ import json
 import sys
 
 try:
-    nums_input = ${JSON.stringify(testInput.nums)}
-    target_input = ${testInput.target}
+    nums_input = ${JSON.stringify(testInputData.nums)}
+    target_input = ${testInputData.target}
     result = two_sum(nums_input, target_input)
     if isinstance(result, list):
         result.sort()
@@ -256,6 +396,7 @@ except Exception as e:
     let token: string | null = null;
     try {
       // Submit this specific test case execution code to Judge0
+      console.log(`Submitting Test Case ${i + 1}...`); // Log submission attempt
       token = await submitToJudge0(language_id, testExecutionCode, null); // No stdin needed here
       const result = await pollForResult(token);
 
@@ -270,7 +411,7 @@ except Exception as e:
         firstFailureOutput = `Failed on Test Case ${i + 1}: ${result.status.description}`;
         firstFailureDetails = {
             testCase: i + 1,
-            input: testInput,
+            input: testInputData,
             error: result.stderr || result.compile_output || result.message || 'Execution error',
         };
         console.error(`Test ${i+1} failed (${overallStatus}) for token ${token}:`, firstFailureDetails.error);
@@ -286,8 +427,8 @@ except Exception as e:
         firstFailureOutput = `Failed on Test Case ${i + 1}: Output Format Error`;
         firstFailureDetails = {
             testCase: i + 1,
-            input: testInput,
-            expected: test.expected,
+            input: testInputData,
+            expected: testExpectedOutput,
             gotRaw: result.stdout || '(No output)',
             error: `Could not parse output as JSON: ${parseError}`
         };
@@ -295,24 +436,23 @@ except Exception as e:
         break; // Stop on first failure
       }
 
-      // Sort expected result for comparison
-      let expectedOutput = [...test.expected]; // Create a copy
-      if (Array.isArray(expectedOutput)) {
-          expectedOutput.sort();
+      // Sort actual output if it's an array (expected is already JSONB)
+      if (Array.isArray(actualOutput)) {
+        actualOutput.sort();
       }
 
-      // Compare (assuming simple array/JSON comparison is sufficient)
-      // Actual output is already sorted if it was a list in the runner code
-      if (JSON.stringify(actualOutput) !== JSON.stringify(expectedOutput)) {
+      // Compare JSONB directly (Postgres handles array order differences if needed, but sorting here is safer)
+      // Convert expected_output (JSONB) back to JS object for comparison
+      if (JSON.stringify(actualOutput) !== JSON.stringify(testExpectedOutput)) {
         overallStatus = 'Wrong Answer';
         firstFailureOutput = `Failed on Test Case ${i + 1}: Wrong Answer`;
         firstFailureDetails = {
             testCase: i + 1,
-            input: testInput,
-            expected: expectedOutput,
+            input: testInputData,
+            expected: testExpectedOutput,
             got: actualOutput,
         };
-        console.error(`Test ${i+1} failed (Wrong Answer) for token ${token}. Expected: ${JSON.stringify(expectedOutput)}, Got: ${JSON.stringify(actualOutput)}`);
+        console.error(`Test ${i+1} failed (Wrong Answer) for token ${token}. Expected: ${JSON.stringify(testExpectedOutput)}, Got: ${JSON.stringify(actualOutput)}`);
         break; // Stop on first wrong answer
       }
 
@@ -329,6 +469,14 @@ except Exception as e:
       // Use next to pass the error to the global error handler, but we've already captured the state
       return next(error);
     }
+
+    // --- Add delay before next iteration (except for the last one) ---
+    if (i < tests.length - 1) {
+      console.log(`Waiting 1 second before next test case...`);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1000 ms = 1 second
+    }
+    // --- End of Delay ---
+
   }
 
   // --- Format and Send Response --- 
@@ -343,18 +491,53 @@ except Exception as e:
 
   if (overallStatus === 'Accepted') {
     responsePayload.output = `Accepted: Passed ${passedTests}/${totalTests} test cases.`;
-    console.log(`Problem '${problem_id}' Passed All Tests.`);
+    console.log(`Problem '${problem_slug}' Passed All Tests.`);
   } else {
     // Keep the summary error message concise
     responsePayload.error = firstFailureOutput || `Failed after passing ${passedTests} tests.`; 
     responsePayload.details = firstFailureDetails; // More detailed object about the failure
-    console.log(`Problem '${problem_id}' Failed. Status: ${overallStatus}. Passed ${passedTests}/${totalTests} tests.`);
+    console.log(`Problem '${problem_slug}' Failed. Status: ${overallStatus}. Passed ${passedTests}/${totalTests} tests.`);
   }
 
   res.json(responsePayload); // Send the final response
   // No return here, implicitly returns void
 }));
 // --- End of /api/run-tests ---
+
+// --- API Endpoints ---
+
+// NEW Endpoint: Get all problems
+app.get('/api/problems', asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const result = await dbPool.query('SELECT id, slug, title, difficulty FROM problems ORDER BY id ASC');
+    res.json(result.rows);
+  } catch (error) {
+    next(error); // Pass to global error handler
+  }
+}));
+
+// Existing Endpoint: Get a specific problem by slug
+app.get('/api/problems/:slug', asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const slug = req.params.slug;
+    try {
+        const problemRes = await dbPool.query('SELECT id, slug, title, difficulty, description, function_signature FROM problems WHERE slug = $1', [slug]);
+        if (problemRes.rows.length === 0) {
+            res.status(404).json({ error: 'Problem not found' });
+            return;
+        }
+        const problem = problemRes.rows[0];
+        const examplesRes = await dbPool.query('SELECT input_description, output_description, explanation, "order" FROM problem_examples WHERE problem_id = $1 ORDER BY "order" ASC', [problem.id]);
+        const constraintsRes = await dbPool.query('SELECT text, "order" FROM problem_constraints WHERE problem_id = $1 ORDER BY "order" ASC', [problem.id]);
+        
+        res.json({
+            ...problem,
+            examples: examplesRes.rows.map(e => ({ input: e.input_description, output: e.output_description, explanation: e.explanation })),
+            constraints: constraintsRes.rows.map(c => c.text)
+        });
+    } catch (error) {
+        next(error);
+    }
+}));
 
 // --- Global Error Handler ---
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

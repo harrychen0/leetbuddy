@@ -1,0 +1,27 @@
+{
+  "slug": "two-sum",
+  "title": "Two Sum",
+  "difficulty": "Easy",
+  "description": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\\n\\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.\\n\\nYou can return the answer in any order.",
+  "functionSignature": "def two_sum(nums: list[int], target: int) -> list[int]:\\n    \\\"\\\"\\\"\\n    Given an array of integers nums and an integer target, return indices\\n    of the two numbers such that they add up to target.\\n\\n    Args:\\n        nums: A list of integers.\\n        target: The target sum.\\n\\n    Returns:\\n        A list containing the indices of the two numbers.\\n    \\\"\\\"\\\"\\n    # --- WRITE YOUR SOLUTION HERE ---\\n\\n    pass\\n\\n    # --- END OF SOLUTION ---",
+  "examples": [
+    { "inputDescription": "nums = [2,7,11,15], target = 9", "outputDescription": "[0,1]", "order": 1 },
+    { "inputDescription": "nums = [3,2,4], target = 6", "outputDescription": "[1,2]", "order": 2 },
+    { "inputDescription": "nums = [3,3], target = 6", "outputDescription": "[0,1]", "order": 3 }
+  ],
+  "constraints": [
+    { "text": "2 <= nums.length <= 10^4", "order": 1 },
+    { "text": "-10^9 <= nums[i] <= 10^9", "order": 2 },
+    { "text": "-10^9 <= target <= 10^9", "order": 3 },
+    { "text": "Only one valid answer exists.", "order": 4 }
+  ],
+  "testCases": [
+    { "inputData": {"nums": [2, 7, 11, 15], "target": 9}, "expectedOutput": [0, 1], "isHidden": false, "order": 1 },
+    { "inputData": {"nums": [3, 2, 4], "target": 6}, "expectedOutput": [1, 2], "isHidden": false, "order": 2 },
+    { "inputData": {"nums": [3, 3], "target": 6}, "expectedOutput": [0, 1], "isHidden": false, "order": 3 },
+    { "inputData": {"nums": [1, 5, 8, 12, 20], "target": 28}, "expectedOutput": [3, 4], "isHidden": true, "order": 4 },
+    { "inputData": {"nums": [-1, -2, -3, -4, -5], "target": -8}, "expectedOutput": [2, 4], "isHidden": true, "order": 5 },
+    { "inputData": {"nums": [0, 4, 3, 0], "target": 0}, "expectedOutput": [0, 3], "isHidden": true, "order": 6 },
+    { "inputData": {"nums": [5, 75, 25], "target": 100}, "expectedOutput": [1, 2], "isHidden": true, "order": 7 }
+  ]
+} 

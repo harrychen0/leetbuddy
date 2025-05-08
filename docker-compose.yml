@@ -1,0 +1,65 @@
+# docker-compose.yml
+
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      # Map host port 3000 to container port 3000 (backend default)
+      - "3000:3000"
+    env_file:
+      # Load environment variables from .env file at the project root
+      - ./.env
+    # volumes:
+    # Optional: Mount for development (comment out for production image)
+    # - ./backend:/app/backend
+    # - /app/backend/node_modules # Exclude node_modules from mount
+    depends_on:
+      db: # Changed to map format
+        condition: service_healthy # Wait for db to be healthy
+    restart: unless-stopped # Or 'always'
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      # Map host port 8080 (or any other) to container port 80 (Nginx default)
+      - "8080:80"
+    depends_on:
+      # frontend depends on backend, backend depends on db being healthy
+      backend:
+        condition: service_started # Or simply backend if you don't add a healthcheck to backend
+    restart: unless-stopped # Or 'always'
+
+  db:
+    image: postgres:16-alpine # Use a specific version
+    container_name: leetbuddy_db
+    environment:
+      # These must match the values in your .env file
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # Mount the init script to be run on first creation
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro # Added :ro for read-only mount of script
+      # Mount a volume to persist database data across container restarts
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Optionally expose port 5432 locally for direct DB access (e.g., with pgAdmin)
+      # Be careful with exposing DB ports in production
+      - "5432:5432"
+    healthcheck: # Added healthcheck
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -q"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s # Give it some time to start up before first check
+    restart: unless-stopped
+
+volumes:
+  postgres_data: # Define the named volume for persistence
+    driver: local

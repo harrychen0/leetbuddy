@@ -1,0 +1,28 @@
+{
+  "slug": "valid-parentheses",
+  "title": "Valid Parentheses",
+  "difficulty": "Easy",
+  "description": "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.\n\\nAn input string is valid if:\n1. Open brackets must be closed by the same type of brackets.\n2. Open brackets must be closed in the correct order.\n3. Every close bracket has a corresponding open bracket of the same type.",
+  "functionSignature": "def is_valid(s: str) -> bool:\\n    \\\"\\\"\\\"\\n    Checks if the input string containing brackets is valid.\\n\\n    Args:\\n        s: The input string containing brackets.\\n\\n    Returns:\\n        True if the string is valid, False otherwise.\\n    \\\"\\\"\\\"\\n    # --- WRITE YOUR SOLUTION HERE ---\\n\\n    pass\\n\\n    # --- END OF SOLUTION ---",
+  "examples": [
+    { "inputDescription": "s = \"()\"", "outputDescription": "true", "order": 1 },
+    { "inputDescription": "s = \"()[]{}\"", "outputDescription": "true", "order": 2 },
+    { "inputDescription": "s = \"(]\"", "outputDescription": "false", "order": 3 },
+    { "inputDescription": "s = \"{[]}\"", "outputDescription": "true", "order": 4 }
+  ],
+  "constraints": [
+    { "text": "1 <= s.length <= 10^4", "order": 1 },
+    { "text": "s consists of parentheses only '()[]{}'.", "order": 2 }
+  ],
+  "testCases": [
+    { "inputData": {"s": "()"}, "expectedOutput": true, "isHidden": false, "order": 1 },
+    { "inputData": {"s": "()[]{}"}, "expectedOutput": true, "isHidden": false, "order": 2 },
+    { "inputData": {"s": "(]"}, "expectedOutput": false, "isHidden": false, "order": 3 },
+    { "inputData": {"s": "([)]"}, "expectedOutput": false, "isHidden": true, "order": 4 },
+    { "inputData": {"s": "{[]}"}, "expectedOutput": true, "isHidden": false, "order": 5 },
+    { "inputData": {"s": ""}, "expectedOutput": true, "isHidden": true, "order": 6 },
+    { "inputData": {"s": "]"}, "expectedOutput": false, "isHidden": true, "order": 8 },
+    { "inputData": {"s": "((("}, "expectedOutput": false, "isHidden": true, "order": 9 },
+    { "inputData": {"s": "{{[[((()))]]}}"}, "expectedOutput": true, "isHidden": true, "order": 10 }
+  ]
+} 
