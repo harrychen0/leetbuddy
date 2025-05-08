@@ -1,7 +1,5 @@
 # docker-compose.yml
 
-version: "3.8"
-
 services:
   backend:
     build:
@@ -13,30 +11,25 @@ services:
     env_file:
       # Load environment variables from .env file at the project root
       - ./.env
-    # volumes:
-    # Optional: Mount for development (comment out for production image)
-    # - ./backend:/app/backend
-    # - /app/backend/node_modules # Exclude node_modules from mount
     depends_on:
-      db: # Changed to map format
+      db:
         condition: service_healthy # Wait for db to be healthy
-    restart: unless-stopped # Or 'always'
+    restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      # Map host port 8080 (or any other) to container port 80 (Nginx default)
       - "8080:80"
     depends_on:
       # frontend depends on backend, backend depends on db being healthy
       backend:
-        condition: service_started # Or simply backend if you don't add a healthcheck to backend
-    restart: unless-stopped # Or 'always'
+        condition: service_started
+    restart: unless-stopped
 
   db:
-    image: postgres:16-alpine # Use a specific version
+    image: postgres:16-alpine
     container_name: leetbuddy_db
     environment:
       # These must match the values in your .env file
@@ -52,7 +45,7 @@ services:
       # Optionally expose port 5432 locally for direct DB access (e.g., with pgAdmin)
       # Be careful with exposing DB ports in production
       - "5432:5432"
-    healthcheck: # Added healthcheck
+    healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -q"]
       interval: 5s
       timeout: 5s
