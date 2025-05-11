@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { judge0Service, type ProblemListItem } from '@/services/judge0.ts'
+import { problemService, type ProblemListItem } from '@/services/problemService.ts'
+import { useRouter } from 'vue-router'
 
 const problems = ref<ProblemListItem[]>([])
 const isLoading = ref(true)
@@ -11,7 +12,7 @@ async function fetchProblems() {
   isLoading.value = true
   error.value = null
   try {
-    problems.value = await judge0Service.getProblems()
+    problems.value = await problemService.getProblems()
   } catch (err) {
     console.error('Failed to load problems:', err)
     error.value = 'Failed to load problems. Please try again later.'

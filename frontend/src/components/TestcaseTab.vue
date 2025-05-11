@@ -64,7 +64,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type * as monaco from 'monaco-editor'
-import { judge0Service, type ProblemDetails } from '@/services/judge0.ts'
+import { judge0Service } from '@/services/judge0.ts'
+import type { ProblemDetails } from '@/services/problemService.ts'
 
 // Props
 const props = defineProps<{

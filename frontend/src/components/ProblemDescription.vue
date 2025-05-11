@@ -26,7 +26,7 @@ Explanation: {{ example.explanation }}</template></code></pre>
 <script setup lang="ts">
 import { computed } from 'vue'
 import { marked } from 'marked'
-import type { ProblemDetails } from '@/services/judge0.ts' // Assuming ProblemDetails is exported
+import type { ProblemDetails } from '@/services/problemService.ts' // Assuming ProblemDetails is exported
 
 // Define props
 const props = defineProps<{

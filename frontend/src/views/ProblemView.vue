@@ -31,6 +31,13 @@
             >
               Submissions
             </button>
+            <button
+              class="tab-button"
+              :class="{ active: activeTab === 'ai' }"
+              @click="activeTab = 'ai'"
+            >
+              AI Feedback
+            </button>
           </div>
 
           <div v-if="activeTab === 'description'" class="tab-content problem-description-content">
@@ -51,6 +58,10 @@
               :totalTests="totalTests"
               :submitResultsOutput="submitResultsOutput"
             />
+          </div>
+
+          <div v-if="activeTab === 'ai'" class="tab-content ai-feedback-content">
+            <AiFeedbackTab :problemDetails="problemDetails" :userCode="code" />
           </div>
         </div>
       </Pane>
@@ -80,8 +91,10 @@ import ProblemDescription from '@/components/ProblemDescription.vue'
 import TestcaseTab from '@/components/TestcaseTab.vue'
 import SubmissionsTab from '@/components/SubmissionsTab.vue'
 import CodeEditorPane from '@/components/CodeEditorPane.vue'
+import AiFeedbackTab from '@/components/AiFeedbackTab.vue'
 import type * as monaco from 'monaco-editor'
-import { judge0Service, type ProblemDetails } from '@/services/judge0.ts'
+import { judge0Service } from '@/services/judge0.ts'
+import { problemService, type ProblemDetails } from '@/services/problemService.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -128,7 +141,7 @@ async function fetchProblemDetails(slug: string) {
   problemError.value = null
   problemDetails.value = null // Reset previous problem details
   try {
-    const data = await judge0Service.getProblemDetails(slug as string)
+    const data = await problemService.getProblemDetails(slug as string)
     problemDetails.value = data
     code.value = data.function_signature || '' // Set editor code
     // Reset submission status from previous problem
