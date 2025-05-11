@@ -3,7 +3,7 @@
   "title": "Add Two Numbers",
   "difficulty": "Medium",
   "description": "You are given two non-empty arrays representing two non-negative integers. The digits are stored in reverse order, and each element contains a single digit.\\n\\nAdd the two numbers and return the sum as an array in the same format (digits in reverse order).\\n\\nYou may assume the two numbers do not contain any leading zero, except the number 0 itself.",
-  "functionSignature": "def add_two_numbers(l1: list[int], l2: list[int]) -> list[int]:\\n    \\\"\\\"\\\"\\n    Adds two numbers represented by reversed arrays of digits.\\n\\n    Args:\\n        l1: The first number as a reversed array of digits.\\n        l2: The second number as a reversed array of digits.\\n\\n    Returns:\\n        The sum as a reversed array of digits.\\n    \\\"\\\"\\\"\\n    # --- WRITE YOUR SOLUTION HERE ---\\n\\n    pass\\n\\n    # --- END OF SOLUTION ---",
+  "functionSignature": "def add_two_numbers(l1: list[int], l2: list[int]) -> list[int]:",
   "examples": [
     { "inputDescription": "l1 = [2,4,3], l2 = [5,6,4]", "outputDescription": "[7,0,8]", "explanation": "342 + 465 = 807.", "order": 1 },
     { "inputDescription": "l1 = [0], l2 = [0]", "outputDescription": "[0]", "order": 2 },

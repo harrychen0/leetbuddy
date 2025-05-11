@@ -3,7 +3,7 @@
   "title": "Two Sum",
   "difficulty": "Easy",
   "description": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\\n\\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.\\n\\nYou can return the answer in any order.",
-  "functionSignature": "def two_sum(nums: list[int], target: int) -> list[int]:\\n    \\\"\\\"\\\"\\n    Given an array of integers nums and an integer target, return indices\\n    of the two numbers such that they add up to target.\\n\\n    Args:\\n        nums: A list of integers.\\n        target: The target sum.\\n\\n    Returns:\\n        A list containing the indices of the two numbers.\\n    \\\"\\\"\\\"\\n    # --- WRITE YOUR SOLUTION HERE ---\\n\\n    pass\\n\\n    # --- END OF SOLUTION ---",
+  "functionSignature": "def two_sum(nums: list[int], target: int) -> list[int]:",
   "examples": [
     { "inputDescription": "nums = [2,7,11,15], target = 9", "outputDescription": "[0,1]", "order": 1 },
     { "inputDescription": "nums = [3,2,4], target = 6", "outputDescription": "[1,2]", "order": 2 },
