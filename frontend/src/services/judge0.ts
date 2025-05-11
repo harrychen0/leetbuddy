@@ -3,10 +3,6 @@ import axios from 'axios'
 // Point to your backend proxy
 const BACKEND_API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000/api'
 
-// interface SubmissionResponse { // No longer just returns token
-//   token: string
-// }
-
 // Interface for the final result returned by the backend
 interface SubmissionResult {
   stdout: string | null
@@ -22,27 +18,6 @@ interface SubmissionResult {
   token?: string // Backend might still include the token
 }
 
-// Interface for individual problem details (when fetching one problem)
-export interface ProblemDetails {
-  id: number;
-  slug: string;
-  title: string;
-  difficulty: string;
-  description: string;
-  function_signature: string;
-  examples: Array<{ input: string; output: string; explanation?: string }>;
-  constraints: string[];
-  // testCases are handled by the backend now
-}
-
-// NEW: Interface for items in the problem list
-export interface ProblemListItem {
-  id: number;
-  slug: string;
-  title: string;
-  difficulty: string;
-}
-
 // Interface for the response when running tests
 interface TestRunResult {
   status: string; // e.g., 'Accepted', 'Wrong Answer', 'Compilation Error'
@@ -56,28 +31,6 @@ interface TestRunResult {
 }
 
 export const judge0Service = {
-  // Fetches the list of all available problems
-  async getProblems(): Promise<ProblemListItem[]> {
-    try {
-      const response = await axios.get<ProblemListItem[]>(`${BACKEND_API_URL}/problems`)
-      return response.data
-    } catch (error) {
-      console.error('Error fetching problems:', error)
-      throw error // Re-throw to be handled by the component
-    }
-  },
-
-  // Fetches details for a single problem by its slug
-  async getProblemDetails(slug: string): Promise<ProblemDetails> {
-    try {
-      const response = await axios.get<ProblemDetails>(`${BACKEND_API_URL}/problems/${slug}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching problem details for ${slug}:`, error);
-      throw error;
-    }
-  },
-
   // Updated to accept stdin and return the full SubmissionResult
   async submitCode(
     code: string,
@@ -119,21 +72,4 @@ export const judge0Service = {
       throw error;
     }
   },
-
-  // getSubmissionResult is no longer needed as the backend handles polling.
-  // You can remove this function or keep it commented out.
-  /*
-  async getSubmissionResult(token: string): Promise<SubmissionResult> {
-    const response = await axios.get<SubmissionResult>(
-      `${JUDGE0_API_URL}/submissions/${token}`,
-      {
-        headers: {
-          'X-RapidAPI-Key': import.meta.env.VITE_RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
-        },
-      }
-    )
-    return response.data
-  },
-  */
 }
