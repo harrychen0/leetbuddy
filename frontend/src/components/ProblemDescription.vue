@@ -8,7 +8,9 @@
       <h3>Examples:</h3>
       <div v-for="(example, index) in problem.examples" :key="index" class="example">
         <h4>Example {{ index + 1 }}:</h4>
-        <pre><code>Input: {{ example.input }}\nOutput: {{ example.output }}<template v-if="example.explanation">\nExplanation: {{ example.explanation }}</template></code></pre>
+        <pre><code>Input: {{ example.input }}
+Output: {{ example.output }}<template v-if="example.explanation">
+Explanation: {{ example.explanation }}</template></code></pre>
       </div>
     </div>
 
@@ -35,7 +37,7 @@ const props = defineProps<{
 const renderedDescription = computed(() => {
   if (props.problem && props.problem.description) {
     // Basic sanitization or use a more robust library if allowing complex HTML
-    return marked.parse(props.problem.description.replace(/\n/g, '\n'))
+    return marked.parse(props.problem.description.replace(/\\n/g, '\n'))
   }
   return ''
 })
